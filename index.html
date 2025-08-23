@@ -68,7 +68,7 @@
       <div id="out" class="out" contenteditable="false"></div>
 
       <div class="foot">
-        <strong>Nota:</strong> Los enlaces acortados <code class="k">amzn.to</code> no pueden expandirse aquí (limitación del navegador). Pega la URL completa.
+        <strong>Nota:</strong> Los enlaces acortados <code class="k">amzn.to</code> no pueden expandirse aquí (limitación del navegador). Pega la URL completa del producto.
       </div>
 
       <div class="disclosure">
@@ -82,91 +82,82 @@
 <script>
 "use strict";
 
-// ========= CONFIGURA TUS TAGS =========
-const DEFAULT_TAG = "keytrading-21"; // <-- tu tag principal
+/* ============== CONFIGURA TUS TAGS ============== */
+const DEFAULT_TAG = "keytrading-21"; // ← tu tag principal (.es suele acabar en -21)
 const TAGS_BY_DOMAIN = {
   "amazon.es": "keytrading-21",
   "www.amazon.es": "keytrading-21",
-  // "amazon.com": "TU_TAG_US",
-  // "www.amazon.com": "TU_TAG_US",
-  // "amazon.co.uk": "TU_TAG_UK",
-  // "www.amazon.co.uk": "TU_TAG_UK",
-  // añade los que uses…
+  // "amazon.com": "TU_TAG_US",      "www.amazon.com": "TU_TAG_US",
+  // "amazon.co.uk": "TU_TAG_UK",    "www.amazon.co.uk": "TU_TAG_UK",
+  // "amazon.de": "TU_TAG_DE",       "www.amazon.de": "TU_TAG_DE",
+  // "amazon.fr": "TU_TAG_FR",       "www.amazon.fr": "TU_TAG_FR",
+  // "amazon.it": "TU_TAG_IT",       "www.amazon.it": "TU_TAG_IT",
+  // añade los marketplaces que uses…
 };
 
-// ========= LÓGICA =========
+/* ============== LIMPIEZA DE PARÁMETROS ============== */
 const JUNK_PARAMS_PREFIXES = ["pf_rd_", "pd_rd_", "sp_csd", "aaxitk", "th", "smid", "ie", "psc"];
-const JUNK_PARAMS_EXACT = ["ref", "qid", "sr", "crid", "keywords", "linkCode", "camp", "creative", "creativeASIN", "language", "tag", "ascsubtag"];
+const JUNK_PARAMS_EXACT = [
+  "ref","qid","sr","crid","keywords","linkCode","camp",
+  "creative","creativeASIN","language","tag","ascsubtag"
+];
 
-function extractASINFromPath(pathname) {
-  const patterns = [
-    /\/dp\/([A-Z0-9]{10})(?:[\/?]|$)/i,
-    /\/gp\/product\/([A-Z0-9]{10})(?:[\/?]|$)/i,
-    /\/gp\/aw\/d\/([A-Z0-9]{10})(?:[\/?]|$)/i,
-    /\/gp\/offer-listing\/([A-Z0-9]{10})(?:[\/?]|$)/i
-  ];
-  for (const re of patterns) {
-    const m = pathname.match(re);
-    if (m) return m[1].toUpperCase();
-  }
-  return null;
-}
-
-function domainTagFor(host, fallbackTag) {
-  const key = host.replace(/^www\./i, "");
+/* ============== UTILIDADES ============== */
+function domainTagFor(hostname, fallbackTag) {
+  const key = hostname.replace(/^www\./i, "");
   return TAGS_BY_DOMAIN[key] || fallbackTag || DEFAULT_TAG;
 }
 
-function cleanAndTag(u, affiliateTag, subtag) {
-  // normaliza dominio
-  let host = u.host.replace(/^m\./i, "").replace(/^smile\./i, "");
+function normalizeAmazonHostname(hostname) {
+  // quita m. y smile., fuerza www.
+  let host = hostname.replace(/^m\./i, "").replace(/^smile\./i, "");
   if (!/^www\./i.test(host)) host = "www." + host;
-  u.host = host;
+  return host;
+}
 
-  // fuerza https (por si llega http)
+/* ============== NÚCLEO: LIMPIAR + ETIQUETAR ============== */
+function cleanAndTag(u, affiliateTag, subtag) {
+  // normaliza dominio y protocolo
+  u.hostname = normalizeAmazonHostname(u.hostname);
   u.protocol = "https:";
 
-  // si encontramos ASIN, hacemos canónica /dp/ASIN
-  const asin = extractASINFromPath(u.pathname) || u.searchParams.get("ASIN");
-  if (asin) {
-    u.pathname = `/dp/${asin.toUpperCase()}`;
-    u.search = ""; // limpiamos todo
-    u.searchParams.set("tag", affiliateTag);
-    if (subtag) u.searchParams.set("ascsubtag", subtag);
-    return u.toString();
-  }
-
-  // otras páginas: limpiamos parámetros basura
+  // NO tocamos la ruta (evita 404 raros). Solo limpiamos parámetros.
   for (const key of Array.from(u.searchParams.keys())) {
     if (JUNK_PARAMS_EXACT.includes(key)) u.searchParams.delete(key);
     if (JUNK_PARAMS_PREFIXES.some(p => key.startsWith(p))) u.searchParams.delete(key);
   }
+
+  // aplica tag y subtag
   u.searchParams.set("tag", affiliateTag);
   if (subtag) u.searchParams.set("ascsubtag", subtag);
+
   return u.toString();
 }
 
 function convertRaw(raw, fallbackTag, subtag) {
   if (!raw) throw new Error("Pega una URL de Amazon.");
   let s = raw.trim();
+
   // permite pegar sin protocolo
   if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+
   let u;
   try { u = new URL(s); }
   catch { throw new Error("La URL no es válida."); }
 
-  const h = u.host.toLowerCase();
-  if (h === "amzn.to") {
-    throw new Error("Este es un link acortado (amzn.to). Pega la URL completa del producto.");
+  const host = u.hostname.toLowerCase();
+  if (host === "amzn.to") {
+    throw new Error("Es un link acortado (amzn.to). Pega la URL completa del producto.");
   }
-  if (!/amazon\./i.test(h)) {
-    throw new Error("Esto no parece ser un enlace de Amazon.");
+  if (!/amazon\./i.test(host)) {
+    throw new Error("Esto no parece un enlace de Amazon.");
   }
-  const affiliateTag = domainTagFor(h, fallbackTag);
+
+  const affiliateTag = domainTagFor(host, fallbackTag);
   return cleanAndTag(u, affiliateTag, subtag || "");
 }
 
-// ========= UI =========
+/* ============== UI ============== */
 document.addEventListener("DOMContentLoaded", () => {
   const $in = document.getElementById("in");
   const $tag = document.getElementById("tag");
@@ -176,7 +167,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function setStatus(html) { $status.innerHTML = html; }
 
-  document.getElementById("convert").addEventListener("click", () => {
+  function doConvert() {
     setStatus("");
     try {
       const res = convertRaw($in.value, $tag.value || DEFAULT_TAG, $subtag.value);
@@ -187,19 +178,25 @@ document.addEventListener("DOMContentLoaded", () => {
       $out.textContent = "";
       setStatus('<span class="err">⚠ ' + e.message + '</span>');
     }
-  });
+  }
 
+  document.getElementById("convert").addEventListener("click", doConvert);
   document.getElementById("copy").addEventListener("click", async () => {
     const txt = $out.textContent.trim();
     if (!txt) return setStatus('<span class="warn">Nada para copiar todavía.</span>');
     try { await navigator.clipboard.writeText(txt); setStatus('<span class="ok">Copiado al portapapeles.</span>'); }
     catch { setStatus('<span class="warn">No se pudo copiar automáticamente. Copia manualmente.</span>'); }
   });
-
   document.getElementById("clear").addEventListener("click", () => {
     $in.value = ""; $out.textContent = ""; setStatus(""); $subtag.value = "";
+  });
+
+  // Enter para convertir
+  [$in, $tag, $subtag].forEach(el => {
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") doConvert(); });
   });
 });
 </script>
 </body>
 </html>
+
