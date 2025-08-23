@@ -37,12 +37,13 @@
   <div class="wrap">
     <div class="card">
       <h1>Generador de enlaces de afiliado Amazon</h1>
-      <p>Pega una URL de Amazon y pulsa <strong>Abrir en Amazon</strong>. Se añadirá tu <code class="k">tag=</code> (y un <code class="k">ascsubtag</code> fijo, si lo defines) y se abrirá en una pestaña nueva.</p>
+      <p>Pega una URL de Amazon y usa <strong>Pegar desde portapapeles</strong> o pulsa <strong>Abrir en Amazon</strong>.</p>
 
       <label for="in">URL de Amazon</label>
       <input id="in" type="text" placeholder="Ej.: https://www.amazon.es/dp/B0C1234567?ref_=..." />
 
       <div class="btns">
+        <button id="paste">Pegar desde portapapeles</button>
         <button id="open">Abrir en Amazon</button>
         <button id="clear">Limpiar</button>
       </div>
@@ -63,8 +64,8 @@
 "use strict";
 
 /* ====== TUS TAGS Y SUBTAG FIJO (no se muestran en la interfaz) ====== */
-const DEFAULT_TAG = "keytrading-21";        // ← tu tag principal (.es suele acabar en -21)
-const FIXED_SUBTAG = "";                    // p.ej. "instagram-ago25" o "" para no usar ascsubtag
+const DEFAULT_TAG = "keytrading-21";  // ← tu tag principal (.es suele acabar en -21)
+const FIXED_SUBTAG = "";              // p.ej. "instagram-ago25" o "" para no usar ascsubtag
 const TAGS_BY_DOMAIN = {
   "amazon.es": "keytrading-21",
   "www.amazon.es": "keytrading-21",
@@ -73,6 +74,20 @@ const TAGS_BY_DOMAIN = {
   // "amazon.de": "TU_TAG_DE",       "www.amazon.de": "TU_TAG_DE",
   // "amazon.fr": "TU_TAG_FR",       "www.amazon.fr": "TU_TAG_FR",
   // "amazon.it": "TU_TAG_IT",       "www.amazon.it": "TU_TAG_IT",
+  // "amazon.com.mx": "TU_TAG_MX",   "www.amazon.com.mx": "TU_TAG_MX",
+  // "amazon.ca": "TU_TAG_CA",       "www.amazon.ca": "TU_TAG_CA",
+  // "amazon.com.au": "TU_TAG_AU",   "www.amazon.com.au": "TU_TAG_AU",
+  // "amazon.co.jp": "TU_TAG_JP",    "www.amazon.co.jp": "TU_TAG_JP",
+  // "amazon.nl": "TU_TAG_NL",       "www.amazon.nl": "TU_TAG_NL",
+  // "amazon.se": "TU_TAG_SE",       "www.amazon.se": "TU_TAG_SE",
+  // "amazon.pl": "TU_TAG_PL",       "www.amazon.pl": "TU_TAG_PL",
+  // "amazon.com.tr": "TU_TAG_TR",   "www.amazon.com.tr": "TU_TAG_TR",
+  // "amazon.ae": "TU_TAG_AE",       "www.amazon.ae": "TU_TAG_AE",
+  // "amazon.sa": "TU_TAG_SA",       "www.amazon.sa": "TU_TAG_SA",
+  // "amazon.sg": "TU_TAG_SG",       "www.amazon.sg": "TU_TAG_SG",
+  // "amazon.in": "TU_TAG_IN",       "www.amazon.in": "TU_TAG_IN",
+  // "amazon.eg": "TU_TAG_EG",       "www.amazon.eg": "TU_TAG_EG",
+  // "amazon.com.be": "TU_TAG_BE",   "www.amazon.com.be": "TU_TAG_BE",
 };
 
 /* ====== QUITAMOS TRACKING BASURA, CONSERVAMOS VARIANTES/IDIOMA ====== */
@@ -83,7 +98,16 @@ const DROP_EXACT = [
 ];
 const DROP_PREFIX = ["pf_rd_", "pd_rd_"];
 
-/* ====== UTILIDADES ====== */
+/* ====== MARKETPLACES: detectar país por dominio ====== */
+const MARKET_MAP = {
+  "amazon.com": "US", "amazon.es": "ES", "amazon.de": "DE", "amazon.fr": "FR",
+  "amazon.it": "IT", "amazon.co.uk": "UK", "amazon.ca": "CA", "amazon.com.mx": "MX",
+  "amazon.com.br": "BR", "amazon.com.au": "AU", "amazon.co.jp": "JP",
+  "amazon.nl": "NL", "amazon.se": "SE", "amazon.pl": "PL", "amazon.com.tr": "TR",
+  "amazon.ae": "AE", "amazon.sa": "SA", "amazon.sg": "SG", "amazon.in": "IN",
+  "amazon.eg": "EG", "amazon.com.be": "BE"
+};
+
 function normalizeAmazonHostname(hostname) {
   let host = hostname.replace(/^m\./i, "").replace(/^smile\./i, "");
   if (!/^www\./i.test(host)) host = "www." + host;
@@ -92,6 +116,10 @@ function normalizeAmazonHostname(hostname) {
 function domainTagFor(hostname, fallbackTag) {
   const key = hostname.replace(/^www\./i, "");
   return TAGS_BY_DOMAIN[key] || fallbackTag || DEFAULT_TAG;
+}
+function marketplaceFromHost(hostname) {
+  const key = hostname.replace(/^www\./i, "").toLowerCase();
+  return MARKET_MAP[key] || key.split(".").pop().toUpperCase();
 }
 
 /* ====== NÚCLEO: LIMPIAR + ETIQUETAR ====== */
@@ -124,7 +152,8 @@ function convertRaw(raw, fallbackTag, fixedSubtag) {
   if (!/amazon\./i.test(host)) throw new Error("Esto no parece un enlace de Amazon.");
 
   const affiliateTag = domainTagFor(host, fallbackTag);
-  return cleanAndTag(u, affiliateTag, fixedSubtag || "");
+  const url = cleanAndTag(u, affiliateTag, fixedSubtag || "");
+  return url;
 }
 
 /* ====== UI ====== */
@@ -132,26 +161,47 @@ document.addEventListener("DOMContentLoaded", () => {
   const $in = document.getElementById("in");
   const $status = document.getElementById("status");
 
-  function setStatus(html) { $status.innerHTML = html; }
+  function appendStatus(html) {
+    $status.innerHTML = ($status.innerHTML ? $status.innerHTML + "<br>" : "") + html;
+  }
+  function clearStatus() { $status.innerHTML = ""; }
 
-  function openInAmazon() {
-    setStatus("");
+  async function pasteFromClipboard() {
+    clearStatus();
     try {
-      const url = convertRaw($in.value, DEFAULT_TAG, FIXED_SUBTAG);
-      window.open(url, "_blank", "noopener");
-      setStatus('<span class="ok">✓ Enlace abierto en una nueva pestaña.</span>');
+      const txt = await navigator.clipboard.readText();
+      if (!txt || !txt.trim()) {
+        appendStatus('<span class="warn">No hay nada útil en el portapapeles.</span>');
+        return;
+      }
+      $in.value = txt.trim();
+      appendStatus('<span class="ok">✓ Enlace pegado desde el portapapeles.</span>');
     } catch (e) {
       console.error(e);
-      setStatus('<span class="err">⚠ ' + e.message + '</span>');
+      appendStatus('<span class="warn">No pude leer el portapapeles. Pega manualmente (Cmd/Ctrl + V).</span>');
     }
   }
 
-  document.getElementById("open").addEventListener("click", openInAmazon);
+  function openInAmazon() {
+    try {
+      const url = convertRaw($in.value, DEFAULT_TAG, FIXED_SUBTAG);
+      const u2 = new URL(url);
+      const host = u2.hostname.replace(/^www\./i, "");
+      const country = marketplaceFromHost(u2.hostname);
 
-  document.getElementById("clear").addEventListener("click", () => {
-    $in.value = "";
-    setStatus("");
-  });
+      appendStatus('<span class="ok">✓ Nuevo enlace afiliado generado correctamente.</span> ' +
+                   `<span class="muted">(Dominio: ${host} · País: ${country})</span>`);
+      window.open(url, "_blank", "noopener");
+      appendStatus('<span class="ok">✓ Enlace abierto en una nueva pestaña.</span>');
+    } catch (e) {
+      console.error(e);
+      appendStatus('<span class="err">⚠ ' + e.message + '</span>');
+    }
+  }
+
+  document.getElementById("paste").addEventListener("click", pasteFromClipboard);
+  document.getElementById("open").addEventListener("click", openInAmazon);
+  document.getElementById("clear").addEventListener("click", () => { $in.value = ""; clearStatus(); });
 
   // Enter para abrir directamente
   $in.addEventListener("keydown", e => { if (e.key === "Enter") openInAmazon(); });
