@@ -23,26 +23,21 @@
     input[type="text"] { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #33406d; background: #0c1430; color: #e6e8f0; outline: none; }
     input[type="text"]::placeholder { color: #90a0d0; }
     .btns { display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; align-items: center; }
-    button, a.btn { padding: 10px 14px; border: 1px solid #3a4a84; background:#1b2550; color:#e6e8f0; border-radius: 12px; cursor:pointer; text-decoration:none; display:inline-block; }
-    button:hover, a.btn:hover { background:#223066; }
-    .out { margin-top: 18px; padding: 14px; background:#0c1430; border:1px dashed #3a4a84; border-radius: 12px; word-break: break-all; }
+    button { padding: 10px 14px; border: 1px solid #3a4a84; background:#1b2550; color:#e6e8f0; border-radius: 12px; cursor:pointer; }
+    button:hover { background:#223066; }
     small.muted { color:#93a2cf }
     .ok { color: #8ef0b1; font-weight: 600; }
     .warn { color: #ffd27f; font-weight: 600; }
     .err { color: #ff8e8e; font-weight: 600; }
     .foot { margin-top: 18px; font-size: 13px; color:#93a2cf }
-    a { color:#9ec2ff; }
-    .disclosure { margin-top: 10px; font-size: 13px; color:#b8c0dd }
     code.k { background:#0c1430; border:1px solid #33406d; padding:2px 6px; border-radius:8px }
-    .toggle { display:block; margin-top: 4px; font-size: 14px; color:#b8c0dd; }
-    .hidden { display:none !important; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>Generador de enlaces de afiliado Amazon</h1>
-      <p>Pega cualquier URL de Amazon y obtén tu enlace con <code class="k">tag=</code> (oculto en la UI) y <code class="k">ascsubtag</code> (opcional). Puedes abrir o copiar sin mostrar la URL.</p>
+      <p>Pega una URL de Amazon y pulsa <strong>Abrir en Amazon</strong>. Se añadirá tu <code class="k">tag=</code> (y <code class="k">ascsubtag</code> si lo indicas) y se abrirá el enlace en una pestaña nueva.</p>
 
       <label for="in">URL de Amazon</label>
       <input id="in" type="text" placeholder="Ej.: https://www.amazon.es/dp/B0C1234567?ref_=..." />
@@ -52,26 +47,18 @@
       <small class="muted">Se añade como <code class="k">ascsubtag</code> para tu tracking.</small>
 
       <div class="btns">
-        <button id="convert">Convertir</button>
-        <a id="go" href="#" target="_blank" rel="noopener" class="btn hidden">Abrir en Amazon</a>
-        <button id="copy" title="Copiar resultado">Copiar</button>
+        <button id="open">Abrir en Amazon</button>
         <button id="clear">Limpiar</button>
-        <label class="toggle">
-          <input id="showLink" type="checkbox"> Mostrar enlace visible
-        </label>
       </div>
 
       <div id="status" class="foot"></div>
-      <div id="out" class="out" contenteditable="false"></div>
 
       <div class="foot">
         <strong>Nota:</strong> Los enlaces acortados <code class="k">amzn.to</code> no pueden expandirse aquí (limitación del navegador). Pega la URL completa del producto.
       </div>
 
-      <div class="disclosure">
-        <strong>Disclosure:</strong>
-        <div>ES: <em>“Como afiliado de Amazon, gano con compras que cumplen los requisitos.”</em></div>
-        <div>EN: <em>“As an Amazon Associate I earn from qualifying purchases.”</em></div>
+      <div class="foot">
+        <em>Recordatorio:</em> el usuario verá el <code class="k">tag=</code> en la barra de direcciones de Amazon tras abrir la página (esto es normal y conforme a las políticas).
       </div>
     </div>
   </div>
@@ -79,7 +66,7 @@
 <script>
 "use strict";
 
-/* ============== TUS TAGS (no se muestran en la UI) ============== */
+/* ====== TUS TAGS (no se muestran en la interfaz) ====== */
 const DEFAULT_TAG = "keytrading-21"; // ← tu tag principal (.es suele acabar en -21)
 const TAGS_BY_DOMAIN = {
   "amazon.es": "keytrading-21",
@@ -91,7 +78,7 @@ const TAGS_BY_DOMAIN = {
   // "amazon.it": "TU_TAG_IT",       "www.amazon.it": "TU_TAG_IT",
 };
 
-/* ============== QUITAMOS TRACKING BASURA, CONSERVAMOS VARIANTES/IDIOMA ============== */
+/* ====== QUITAMOS TRACKING BASURA, CONSERVAMOS VARIANTES/IDIOMA ====== */
 const DROP_EXACT = [
   "ref", "ref_", "qid", "sr", "crid",
   "linkCode", "linkId", "camp", "creative", "creativeASIN",
@@ -99,7 +86,7 @@ const DROP_EXACT = [
 ];
 const DROP_PREFIX = ["pf_rd_", "pd_rd_"];
 
-/* ============== UTILIDADES ============== */
+/* ====== UTILIDADES ====== */
 function normalizeAmazonHostname(hostname) {
   let host = hostname.replace(/^m\./i, "").replace(/^smile\./i, "");
   if (!/^www\./i.test(host)) host = "www." + host;
@@ -110,7 +97,7 @@ function domainTagFor(hostname, fallbackTag) {
   return TAGS_BY_DOMAIN[key] || fallbackTag || DEFAULT_TAG;
 }
 
-/* ============== NÚCLEO: LIMPIAR + ETIQUETAR ============== */
+/* ====== NÚCLEO: LIMPIAR + ETIQUETAR ====== */
 function cleanAndTag(u, affiliateTag, subtag) {
   u.hostname = normalizeAmazonHostname(u.hostname);
   u.protocol = "https:";
@@ -143,74 +130,39 @@ function convertRaw(raw, fallbackTag, subtag) {
   return cleanAndTag(u, affiliateTag, subtag || "");
 }
 
-/* ============== UI ============== */
+/* ====== UI ====== */
 document.addEventListener("DOMContentLoaded", () => {
   const $in = document.getElementById("in");
   const $subtag = document.getElementById("subtag");
-  const $out = document.getElementById("out");
   const $status = document.getElementById("status");
-  const $go = document.getElementById("go");
-  const $showLink = document.getElementById("showLink");
-
-  let lastUrl = ""; // último enlace generado (aunque no se muestre)
 
   function setStatus(html) { $status.innerHTML = html; }
 
-  function updateVisibleLink() {
-    if ($showLink.checked && lastUrl) {
-      $out.textContent = lastUrl;
-      $out.classList.remove("hidden");
-    } else {
-      $out.textContent = "";
-      $out.classList.remove("hidden");
-    }
-  }
-
-  function doConvert() {
+  async function openInAmazon() {
     setStatus("");
     try {
-      const res = convertRaw($in.value, DEFAULT_TAG, $subtag.value);
-      lastUrl = res;
-      $go.href = res;
-      $go.classList.remove("hidden");
-      updateVisibleLink();
-      setStatus('<span class="ok">✓ Enlace preparado.</span>');
+      const url = convertRaw($in.value, DEFAULT_TAG, $subtag.value);
+      // Abrimos sin dejar el enlace en el DOM (no hay <a href=...>).
+      window.open(url, "_blank", "noopener");
+      setStatus('<span class="ok">✓ Enlace abierto en una nueva pestaña.</span>');
     } catch (e) {
       console.error(e);
-      lastUrl = "";
-      $go.href = "#";
-      $go.classList.add("hidden");
-      $out.textContent = "";
       setStatus('<span class="err">⚠ ' + e.message + '</span>');
     }
   }
 
-  document.getElementById("convert").addEventListener("click", doConvert);
-
-  document.getElementById("copy").addEventListener("click", async () => {
-    if (!lastUrl) return setStatus('<span class="warn">Nada para copiar todavía.</span>');
-    try {
-      await navigator.clipboard.writeText(lastUrl);
-      setStatus('<span class="ok">Copiado al portapapeles.</span>');
-    } catch {
-      setStatus('<span class="warn">No se pudo copiar automáticamente. Copia manualmente.</span>');
-    }
-  });
+  document.getElementById("open").addEventListener("click", openInAmazon);
 
   document.getElementById("clear").addEventListener("click", () => {
     $in.value = "";
     $subtag.value = "";
-    lastUrl = "";
-    $go.href = "#";
-    $go.classList.add("hidden");
-    $out.textContent = "";
     setStatus("");
   });
 
-  $showLink.addEventListener("change", updateVisibleLink);
-
-  // Enter para convertir
-  [$in, $subtag].forEach(el => el.addEventListener("keydown", e => { if (e.key === "Enter") doConvert(); }));
+  // Enter para abrir directamente
+  [$in, $subtag].forEach(el => el.addEventListener("keydown", e => {
+    if (e.key === "Enter") openInAmazon();
+  }));
 });
 </script>
 </body>
