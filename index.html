@@ -5,6 +5,7 @@
 \paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -92,27 +93,28 @@ const TAGS_BY_DOMAIN = {
   // "amazon.de": "TU_TAG_DE",       "www.amazon.de": "TU_TAG_DE",
   // "amazon.fr": "TU_TAG_FR",       "www.amazon.fr": "TU_TAG_FR",
   // "amazon.it": "TU_TAG_IT",       "www.amazon.it": "TU_TAG_IT",
-  // añade los marketplaces que uses…
 };
 
-/* ============== LIMPIEZA DE PARÁMETROS ============== */
-const JUNK_PARAMS_PREFIXES = ["pf_rd_", "pd_rd_", "sp_csd", "aaxitk", "th", "smid", "ie", "psc"];
-const JUNK_PARAMS_EXACT = [
-  "ref","qid","sr","crid","keywords","linkCode","camp",
-  "creative","creativeASIN","language","tag","ascsubtag"
+/* ============== PARÁMETROS A ELIMINAR (tracking) ============== */
+/* Nota: Conservamos th (variante), language, smid (vendedor), psc, ie, etc. */
+const DROP_EXACT = [
+  "ref", "ref_", "qid", "sr", "crid",
+  "linkCode", "linkId", "camp", "creative", "creativeASIN",
+  "aaxitk", "sp_csd", "tag", "ascsubtag", "content-id"
+];
+const DROP_PREFIX = [
+  "pf_rd_", "pd_rd_"
 ];
 
 /* ============== UTILIDADES ============== */
-function domainTagFor(hostname, fallbackTag) {
-  const key = hostname.replace(/^www\./i, "");
-  return TAGS_BY_DOMAIN[key] || fallbackTag || DEFAULT_TAG;
-}
-
 function normalizeAmazonHostname(hostname) {
-  // quita m. y smile., fuerza www.
   let host = hostname.replace(/^m\./i, "").replace(/^smile\./i, "");
   if (!/^www\./i.test(host)) host = "www." + host;
   return host;
+}
+function domainTagFor(hostname, fallbackTag) {
+  const key = hostname.replace(/^www\./i, "");
+  return TAGS_BY_DOMAIN[key] || fallbackTag || DEFAULT_TAG;
 }
 
 /* ============== NÚCLEO: LIMPIAR + ETIQUETAR ============== */
@@ -121,10 +123,10 @@ function cleanAndTag(u, affiliateTag, subtag) {
   u.hostname = normalizeAmazonHostname(u.hostname);
   u.protocol = "https:";
 
-  // NO tocamos la ruta (evita 404 raros). Solo limpiamos parámetros.
+  // elimina solo parámetros de tracking conocidos
   for (const key of Array.from(u.searchParams.keys())) {
-    if (JUNK_PARAMS_EXACT.includes(key)) u.searchParams.delete(key);
-    if (JUNK_PARAMS_PREFIXES.some(p => key.startsWith(p))) u.searchParams.delete(key);
+    if (DROP_EXACT.includes(key)) u.searchParams.delete(key);
+    if (DROP_PREFIX.some(p => key.startsWith(p))) u.searchParams.delete(key);
   }
 
   // aplica tag y subtag
@@ -137,9 +139,7 @@ function cleanAndTag(u, affiliateTag, subtag) {
 function convertRaw(raw, fallbackTag, subtag) {
   if (!raw) throw new Error("Pega una URL de Amazon.");
   let s = raw.trim();
-
-  // permite pegar sin protocolo
-  if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+  if (!/^https?:\/\//i.test(s)) s = "https://" + s; // acepta sin protocolo
 
   let u;
   try { u = new URL(s); }
@@ -184,17 +184,19 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("copy").addEventListener("click", async () => {
     const txt = $out.textContent.trim();
     if (!txt) return setStatus('<span class="warn">Nada para copiar todavía.</span>');
-    try { await navigator.clipboard.writeText(txt); setStatus('<span class="ok">Copiado al portapapeles.</span>'); }
-    catch { setStatus('<span class="warn">No se pudo copiar automáticamente. Copia manualmente.</span>'); }
+    try {
+      await navigator.clipboard.writeText(txt);
+      setStatus('<span class="ok">Copiado al portapapeles.</span>');
+    } catch {
+      setStatus('<span class="warn">No se pudo copiar automáticamente. Copia manualmente.</span>');
+    }
   });
   document.getElementById("clear").addEventListener("click", () => {
     $in.value = ""; $out.textContent = ""; setStatus(""); $subtag.value = "";
   });
 
   // Enter para convertir
-  [$in, $tag, $subtag].forEach(el => {
-    el.addEventListener("keydown", (e) => { if (e.key === "Enter") doConvert(); });
-  });
+  [$in, $tag, $subtag].forEach(el => el.addEventListener("keydown", e => { if (e.key === "Enter") doConvert(); }));
 });
 </script>
 </body>
