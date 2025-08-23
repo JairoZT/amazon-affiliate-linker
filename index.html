@@ -5,207 +5,201 @@
 \paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
-\f0\fs24 \cf0 <!DOCTYPE html>\
-<html lang="es">\
-<head>\
-  <meta charset="utf-8" />\
-  <meta name="viewport" content="width=device-width,initial-scale=1" />\
-  <title>Generador de enlaces de afiliado Amazon</title>\
-  <style>\
-    :root \{ font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; \}\
-    body \{ margin: 0; background: #0b1020; color: #e6e8f0; \}\
-    .wrap \{ max-width: 780px; margin: 0 auto; padding: 24px; \}\
-    .card \{ background: #121a34; border: 1px solid #263055; border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.25); \}\
-    h1 \{ margin: 0 0 8px; font-size: 24px; \}\
-    p \{ color: #b8c0dd; \}\
-    label \{ display:block; margin: 16px 0 8px; font-weight: 600; \}\
-    input[type="text"] \{ width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #33406d; background: #0c1430; color: #e6e8f0; outline: none; \}\
-    input[type="text"]::placeholder \{ color: #90a0d0; \}\
-    .row \{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; \}\
-    .btns \{ display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; \}\
-    button \{ padding: 10px 14px; border: 1px solid #3a4a84; background:#1b2550; color:#e6e8f0; border-radius: 12px; cursor:pointer; \}\
-    button:hover \{ background:#223066; \}\
-    .out \{ margin-top: 18px; padding: 14px; background:#0c1430; border:1px dashed #3a4a84; border-radius: 12px; word-break: break-all; \}\
-    small.muted \{ color:#93a2cf \}\
-    .ok \{ color: #8ef0b1; font-weight: 600; \}\
-    .warn \{ color: #ffd27f; font-weight: 600; \}\
-    .err \{ color: #ff8e8e; font-weight: 600; \}\
-    .foot \{ margin-top: 18px; font-size: 13px; color:#93a2cf \}\
-    a \{ color:#9ec2ff; \}\
-    .disclosure \{ margin-top: 10px; font-size: 13px; color:#b8c0dd \}\
-    code.k \{ background:#0c1430; border:1px solid #33406d; padding:2px 6px; border-radius:8px \}\
-  </style>\
-</head>\
-<body>\
-  <div class="wrap">\
-    <div class="card">\
-      <h1>Generador de enlaces de afiliado Amazon</h1>\
-      <p>Pega cualquier URL de Amazon y obt\'e9n tu enlace con <code class="k">tag=</code> y <code class="k">ascsubtag</code> (opcional) ya configurados.</p>\
-\
-      <label for="in">URL de Amazon</label>\
-      <input id="in" type="text" placeholder="Ej.: https://www.amazon.es/dp/B0C1234567?ref_=..." />\
-\
-      <div class="row">\
-        <div>\
-          <label for="tag">Tag por defecto</label>\
-          <input id="tag" type="text" value="keytrading-21" />\
-          <small class="muted">C\'e1mbialo si lo necesitas (mercado principal).</small>\
-        </div>\
-        <div>\
-          <label for="subtag">Subtag (opcional)</label>\
-          <input id="subtag" type="text" placeholder="p.ej. instagram-ago25" />\
-          <small class="muted">Se a\'f1ade como <code class="k">ascsubtag</code> para tracking.</small>\
-        </div>\
-      </div>\
-\
-      <div class="btns">\
-        <button id="convert">Convertir</button>\
-        <button id="copy" title="Copiar resultado">Copiar</button>\
-        <button id="clear">Limpiar</button>\
-      </div>\
-\
-      <div id="status" class="foot"></div>\
-      <div id="out" class="out" contenteditable="false"></div>\
-\
-      <div class="foot">\
-        <strong>Nota r\'e1pida:</strong> Los enlaces acortados <code class="k">amzn.to</code> no pueden expandirse en esta p\'e1gina est\'e1tica. Pide la URL completa o usa la versi\'f3n con servidor.\
-        <br/>Cumple las pol\'edticas del Programa de Afiliados (incluye un aviso tipo \'93Como afiliado de Amazon, gano con compras que cumplen los requisitos\'94).\
-      </div>\
-\
-      <div class="disclosure">\
-        <strong>Plantillas de disclosure:</strong>\
-        <div>ES: <em>\'93Como afiliado de Amazon, gano con compras que cumplen los requisitos.\'94</em></div>\
-        <div>EN: <em>\'93As an Amazon Associate I earn from qualifying purchases.\'94</em></div>\
-      </div>\
-    </div>\
-  </div>\
-\
-<script>\
-"use strict";\
-\
-// ==== PERSONALIZA ESTO ====\
-// Tag por defecto y tags por dominio (si tienes tags distintos por pa\'eds)\
-const DEFAULT_TAG = "keytrading-21";\
-const TAGS_BY_DOMAIN = \{\
-  "amazon.es": "keytrading-21",\
-  "www.amazon.es": "keytrading-21",\
-  // "amazon.com": "TU_TAG_US",\
-  // "www.amazon.com": "TU_TAG_US",\
-  // "amazon.de": "TU_TAG_DE",\
-  // "amazon.fr": "TU_TAG_FR",\
-  // a\'f1ade aqu\'ed tus otros marketplaces\'85\
-\};\
-\
-// Par\'e1metros que limpiaremos para no ensuciar la URL final\
-const JUNK_PARAMS_PREFIXES = [\
-  "pf_rd_", "pd_rd_", "sp_csd", "aaxitk", "th", "smid", "ie", "psc"\
-];\
-const JUNK_PARAMS_EXACT = [\
-  "ref", "qid", "sr", "crid", "keywords", "linkCode", "camp",\
-  "creative", "creativeASIN", "language", "tag", "ascsubtag"\
-];\
-\
-// Extrae ASIN de rutas t\'edpicas\
-function extractASINFromPath(pathname) \{\
-  const patterns = [\
-    /\\/dp\\/([A-Z0-9]\{10\})(?:[\\/?]|$)/i,\
-    /\\/gp\\/product\\/([A-Z0-9]\{10\})(?:[\\/?]|$)/i,\
-    /\\/gp\\/aw\\/d\\/([A-Z0-9]\{10\})(?:[\\/?]|$)/i,\
-    /\\/gp\\/offer-listing\\/([A-Z0-9]\{10\})(?:[\\/?]|$)/i\
-  ];\
-  for (const re of patterns) \{\
-    const m = pathname.match(re);\
-    if (m) return m[1].toUpperCase();\
-  \}\
-  return null;\
-\}\
-\
-// Limpia par\'e1metros basura y pone tag/subtag\
-function cleanAndTag(u, affiliateTag, subtag) \{\
-  // Normaliza host: quita "m." y "smile." y fuerza "www."\
-  let host = u.host.replace(/^m\\./i, "").replace(/^smile\\./i, "");\
-  if (!/^www\\./i.test(host)) host = "www." + host;\
-  u.host = host;\
-\
-  // Si es p\'e1gina de producto, reconstruimos la can\'f3nica /dp/ASIN\
-  const asin = extractASINFromPath(u.pathname) || u.searchParams.get("ASIN");\
-  if (asin) \{\
-    u.pathname = `/dp/$\{asin.toUpperCase()\}`;\
-    // Resetea params y a\'f1ade solo los necesarios\
-    u.search = "";\
-    u.searchParams.set("tag", affiliateTag);\
-    if (subtag) u.searchParams.set("ascsubtag", subtag);\
-    return u.toString();\
-  \}\
-\
-  // Para otras p\'e1ginas (b\'fasqueda, categor\'edas, etc.), limpiamos params\
-  for (const key of Array.from(u.searchParams.keys())) \{\
-    if (JUNK_PARAMS_EXACT.includes(key)) u.searchParams.delete(key);\
-    if (JUNK_PARAMS_PREFIXES.some(p => key.startsWith(p))) u.searchParams.delete(key);\
-  \}\
-  u.searchParams.set("tag", affiliateTag);\
-  if (subtag) u.searchParams.set("ascsubtag", subtag);\
-  return u.toString();\
-\}\
-\
-function domainTagFor(host, fallbackTag) \{\
-  const key = host.replace(/^www\\./i, "");\
-  return TAGS_BY_DOMAIN[key] || fallbackTag || DEFAULT_TAG;\
-\}\
-\
-function convertRaw(raw, fallbackTag, subtag) \{\
-  if (!raw) throw new Error("Pega una URL de Amazon.");\
-  let u;\
-  try \{\
-    u = new URL(raw.trim());\
-  \} catch \{\
-    throw new Error("La URL no es v\'e1lida.");\
-  \}\
-  const h = u.host.toLowerCase();\
-  if (h === "amzn.to") \{\
-    throw new Error("Este es un link acortado (amzn.to). Pide la URL completa o usa la versi\'f3n con servidor para expandirlo.");\
-  \}\
-  if (!/amazon\\./i.test(h)) \{\
-    throw new Error("Esto no parece ser un enlace de Amazon.");\
-  \}\
-  const affiliateTag = domainTagFor(h, fallbackTag);\
-  return cleanAndTag(u, affiliateTag, subtag || "");\
-\}\
-\
-// UI\
-const $in = document.getElementById("in");\
-const $tag = document.getElementById("tag");\
-const $subtag = document.getElementById("subtag");\
-const $out = document.getElementById("out");\
-const $status = document.getElementById("status");\
-document.getElementById("convert").addEventListener("click", () => \{\
-  $status.textContent = "";\
-  try \{\
-    const res = convertRaw($in.value, $tag.value || DEFAULT_TAG, $subtag.value);\
-    $out.textContent = res;\
-    $status.innerHTML = '<span class="ok">\uc0\u10003  Enlace generado.</span>';\
-  \} catch (e) \{\
-    $out.textContent = "";\
-    $status.innerHTML = '<span class="err">\uc0\u9888  ' + e.message + '</span>';\
-  \}\
-\});\
-document.getElementById("copy").addEventListener("click", async () => \{\
-  const txt = $out.textContent.trim();\
-  if (!txt) \{\
-    $status.innerHTML = '<span class="warn">Nada para copiar todav\'eda.</span>';\
-    return;\
-  \}\
-  try \{\
-    await navigator.clipboard.writeText(txt);\
-    $status.innerHTML = '<span class="ok">Copiado al portapapeles.</span>';\
-  \} catch \{\
-    $status.innerHTML = '<span class="warn">No se pudo copiar autom\'e1ticamente. Selecciona y copia manualmente.</span>';\
-  \}\
-\});\
-document.getElementById("clear").addEventListener("click", () => \{\
-  $in.value = ""; $out.textContent = ""; $status.textContent = ""; $subtag.value = "";\
-\});\
-</script>\
-</body>\
-</html>\
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Generador de enlaces de afiliado Amazon</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    body { margin: 0; background: #0b1020; color: #e6e8f0; }
+    .wrap { max-width: 780px; margin: 0 auto; padding: 24px; }
+    .card { background: #121a34; border: 1px solid #263055; border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { color: #b8c0dd; }
+    label { display:block; margin: 16px 0 8px; font-weight: 600; }
+    input[type="text"] { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #33406d; background: #0c1430; color: #e6e8f0; outline: none; }
+    input[type="text"]::placeholder { color: #90a0d0; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .btns { display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; }
+    button { padding: 10px 14px; border: 1px solid #3a4a84; background:#1b2550; color:#e6e8f0; border-radius: 12px; cursor:pointer; }
+    button:hover { background:#223066; }
+    .out { margin-top: 18px; padding: 14px; background:#0c1430; border:1px dashed #3a4a84; border-radius: 12px; word-break: break-all; }
+    small.muted { color:#93a2cf }
+    .ok { color: #8ef0b1; font-weight: 600; }
+    .warn { color: #ffd27f; font-weight: 600; }
+    .err { color: #ff8e8e; font-weight: 600; }
+    .foot { margin-top: 18px; font-size: 13px; color:#93a2cf }
+    a { color:#9ec2ff; }
+    .disclosure { margin-top: 10px; font-size: 13px; color:#b8c0dd }
+    code.k { background:#0c1430; border:1px solid #33406d; padding:2px 6px; border-radius:8px }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Generador de enlaces de afiliado Amazon</h1>
+      <p>Pega cualquier URL de Amazon y obtén tu enlace con <code class="k">tag=</code> y <code class="k">ascsubtag</code> (opcional) ya configurados.</p>
+
+      <label for="in">URL de Amazon</label>
+      <input id="in" type="text" placeholder="Ej.: https://www.amazon.es/dp/B0C1234567?ref_=..." />
+
+      <div class="row">
+        <div>
+          <label for="tag">Tag por defecto</label>
+          <input id="tag" type="text" value="keytrading-21" />
+          <small class="muted">Cámbialo por tu tag real.</small>
+        </div>
+        <div>
+          <label for="subtag">Subtag (opcional)</label>
+          <input id="subtag" type="text" placeholder="p.ej. instagram-ago25" />
+          <small class="muted">Se añade como <code class="k">ascsubtag</code>.</small>
+        </div>
+      </div>
+
+      <div class="btns">
+        <button id="convert">Convertir</button>
+        <button id="copy" title="Copiar resultado">Copiar</button>
+        <button id="clear">Limpiar</button>
+      </div>
+
+      <div id="status" class="foot"></div>
+      <div id="out" class="out" contenteditable="false"></div>
+
+      <div class="foot">
+        <strong>Nota:</strong> Los enlaces acortados <code class="k">amzn.to</code> no pueden expandirse aquí (limitación del navegador). Pega la URL completa.
+      </div>
+
+      <div class="disclosure">
+        <strong>Disclosure:</strong>
+        <div>ES: <em>“Como afiliado de Amazon, gano con compras que cumplen los requisitos.”</em></div>
+        <div>EN: <em>“As an Amazon Associate I earn from qualifying purchases.”</em></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+"use strict";
+
+// ========= CONFIGURA TUS TAGS =========
+const DEFAULT_TAG = "keytrading-21"; // <-- tu tag principal
+const TAGS_BY_DOMAIN = {
+  "amazon.es": "keytrading-21",
+  "www.amazon.es": "keytrading-21",
+  // "amazon.com": "TU_TAG_US",
+  // "www.amazon.com": "TU_TAG_US",
+  // "amazon.co.uk": "TU_TAG_UK",
+  // "www.amazon.co.uk": "TU_TAG_UK",
+  // añade los que uses…
+};
+
+// ========= LÓGICA =========
+const JUNK_PARAMS_PREFIXES = ["pf_rd_", "pd_rd_", "sp_csd", "aaxitk", "th", "smid", "ie", "psc"];
+const JUNK_PARAMS_EXACT = ["ref", "qid", "sr", "crid", "keywords", "linkCode", "camp", "creative", "creativeASIN", "language", "tag", "ascsubtag"];
+
+function extractASINFromPath(pathname) {
+  const patterns = [
+    /\/dp\/([A-Z0-9]{10})(?:[\/?]|$)/i,
+    /\/gp\/product\/([A-Z0-9]{10})(?:[\/?]|$)/i,
+    /\/gp\/aw\/d\/([A-Z0-9]{10})(?:[\/?]|$)/i,
+    /\/gp\/offer-listing\/([A-Z0-9]{10})(?:[\/?]|$)/i
+  ];
+  for (const re of patterns) {
+    const m = pathname.match(re);
+    if (m) return m[1].toUpperCase();
+  }
+  return null;
 }
+
+function domainTagFor(host, fallbackTag) {
+  const key = host.replace(/^www\./i, "");
+  return TAGS_BY_DOMAIN[key] || fallbackTag || DEFAULT_TAG;
+}
+
+function cleanAndTag(u, affiliateTag, subtag) {
+  // normaliza dominio
+  let host = u.host.replace(/^m\./i, "").replace(/^smile\./i, "");
+  if (!/^www\./i.test(host)) host = "www." + host;
+  u.host = host;
+
+  // fuerza https (por si llega http)
+  u.protocol = "https:";
+
+  // si encontramos ASIN, hacemos canónica /dp/ASIN
+  const asin = extractASINFromPath(u.pathname) || u.searchParams.get("ASIN");
+  if (asin) {
+    u.pathname = `/dp/${asin.toUpperCase()}`;
+    u.search = ""; // limpiamos todo
+    u.searchParams.set("tag", affiliateTag);
+    if (subtag) u.searchParams.set("ascsubtag", subtag);
+    return u.toString();
+  }
+
+  // otras páginas: limpiamos parámetros basura
+  for (const key of Array.from(u.searchParams.keys())) {
+    if (JUNK_PARAMS_EXACT.includes(key)) u.searchParams.delete(key);
+    if (JUNK_PARAMS_PREFIXES.some(p => key.startsWith(p))) u.searchParams.delete(key);
+  }
+  u.searchParams.set("tag", affiliateTag);
+  if (subtag) u.searchParams.set("ascsubtag", subtag);
+  return u.toString();
+}
+
+function convertRaw(raw, fallbackTag, subtag) {
+  if (!raw) throw new Error("Pega una URL de Amazon.");
+  let s = raw.trim();
+  // permite pegar sin protocolo
+  if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+  let u;
+  try { u = new URL(s); }
+  catch { throw new Error("La URL no es válida."); }
+
+  const h = u.host.toLowerCase();
+  if (h === "amzn.to") {
+    throw new Error("Este es un link acortado (amzn.to). Pega la URL completa del producto.");
+  }
+  if (!/amazon\./i.test(h)) {
+    throw new Error("Esto no parece ser un enlace de Amazon.");
+  }
+  const affiliateTag = domainTagFor(h, fallbackTag);
+  return cleanAndTag(u, affiliateTag, subtag || "");
+}
+
+// ========= UI =========
+document.addEventListener("DOMContentLoaded", () => {
+  const $in = document.getElementById("in");
+  const $tag = document.getElementById("tag");
+  const $subtag = document.getElementById("subtag");
+  const $out = document.getElementById("out");
+  const $status = document.getElementById("status");
+
+  function setStatus(html) { $status.innerHTML = html; }
+
+  document.getElementById("convert").addEventListener("click", () => {
+    setStatus("");
+    try {
+      const res = convertRaw($in.value, $tag.value || DEFAULT_TAG, $subtag.value);
+      $out.textContent = res;
+      setStatus('<span class="ok">✓ Enlace generado.</span>');
+    } catch (e) {
+      console.error(e);
+      $out.textContent = "";
+      setStatus('<span class="err">⚠ ' + e.message + '</span>');
+    }
+  });
+
+  document.getElementById("copy").addEventListener("click", async () => {
+    const txt = $out.textContent.trim();
+    if (!txt) return setStatus('<span class="warn">Nada para copiar todavía.</span>');
+    try { await navigator.clipboard.writeText(txt); setStatus('<span class="ok">Copiado al portapapeles.</span>'); }
+    catch { setStatus('<span class="warn">No se pudo copiar automáticamente. Copia manualmente.</span>'); }
+  });
+
+  document.getElementById("clear").addEventListener("click", () => {
+    $in.value = ""; $out.textContent = ""; setStatus(""); $subtag.value = "";
+  });
+});
+</script>
+</body>
+</html>
