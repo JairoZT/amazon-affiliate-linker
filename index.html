@@ -22,7 +22,6 @@
     label { display:block; margin: 16px 0 8px; font-weight: 600; }
     input[type="text"] { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #33406d; background: #0c1430; color: #e6e8f0; outline: none; }
     input[type="text"]::placeholder { color: #90a0d0; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .btns { display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; align-items: center; }
     button, a.btn { padding: 10px 14px; border: 1px solid #3a4a84; background:#1b2550; color:#e6e8f0; border-radius: 12px; cursor:pointer; text-decoration:none; display:inline-block; }
     button:hover, a.btn:hover { background:#223066; }
@@ -43,23 +42,14 @@
   <div class="wrap">
     <div class="card">
       <h1>Generador de enlaces de afiliado Amazon</h1>
-      <p>Pega cualquier URL de Amazon y obtén tu enlace con <code class="k">tag=</code> y <code class="k">ascsubtag</code> (opcional). Puedes abrir el enlace sin mostrarlo en pantalla.</p>
+      <p>Pega cualquier URL de Amazon y obtén tu enlace con <code class="k">tag=</code> (oculto en la UI) y <code class="k">ascsubtag</code> (opcional). Puedes abrir o copiar sin mostrar la URL.</p>
 
       <label for="in">URL de Amazon</label>
       <input id="in" type="text" placeholder="Ej.: https://www.amazon.es/dp/B0C1234567?ref_=..." />
 
-      <div class="row">
-        <div>
-          <label for="tag">Tag por defecto</label>
-          <input id="tag" type="text" value="keytrading-21" />
-          <small class="muted">Cámbialo por tu tag real.</small>
-        </div>
-        <div>
-          <label for="subtag">Subtag (opcional)</label>
-          <input id="subtag" type="text" placeholder="p.ej. instagram-ago25" />
-          <small class="muted">Se añade como <code class="k">ascsubtag</code>.</small>
-        </div>
-      </div>
+      <label for="subtag">Subtag (opcional)</label>
+      <input id="subtag" type="text" placeholder="p.ej. instagram-ago25" />
+      <small class="muted">Se añade como <code class="k">ascsubtag</code> para tu tracking.</small>
 
       <div class="btns">
         <button id="convert">Convertir</button>
@@ -89,7 +79,7 @@
 <script>
 "use strict";
 
-/* ============== CONFIGURA TUS TAGS ============== */
+/* ============== TUS TAGS (no se muestran en la UI) ============== */
 const DEFAULT_TAG = "keytrading-21"; // ← tu tag principal (.es suele acabar en -21)
 const TAGS_BY_DOMAIN = {
   "amazon.es": "keytrading-21",
@@ -101,8 +91,7 @@ const TAGS_BY_DOMAIN = {
   // "amazon.it": "TU_TAG_IT",       "www.amazon.it": "TU_TAG_IT",
 };
 
-/* ============== PARÁMETROS A ELIMINAR (tracking) ============== */
-/* Conservamos th (variante), language, smid (vendedor), psc, ie, etc. */
+/* ============== QUITAMOS TRACKING BASURA, CONSERVAMOS VARIANTES/IDIOMA ============== */
 const DROP_EXACT = [
   "ref", "ref_", "qid", "sr", "crid",
   "linkCode", "linkId", "camp", "creative", "creativeASIN",
@@ -123,17 +112,14 @@ function domainTagFor(hostname, fallbackTag) {
 
 /* ============== NÚCLEO: LIMPIAR + ETIQUETAR ============== */
 function cleanAndTag(u, affiliateTag, subtag) {
-  // normaliza dominio y protocolo
   u.hostname = normalizeAmazonHostname(u.hostname);
   u.protocol = "https:";
 
-  // elimina solo parámetros de tracking conocidos
   for (const key of Array.from(u.searchParams.keys())) {
     if (DROP_EXACT.includes(key)) u.searchParams.delete(key);
     if (DROP_PREFIX.some(p => key.startsWith(p))) u.searchParams.delete(key);
   }
 
-  // aplica tag y subtag
   u.searchParams.set("tag", affiliateTag);
   if (subtag) u.searchParams.set("ascsubtag", subtag);
 
@@ -143,7 +129,7 @@ function cleanAndTag(u, affiliateTag, subtag) {
 function convertRaw(raw, fallbackTag, subtag) {
   if (!raw) throw new Error("Pega una URL de Amazon.");
   let s = raw.trim();
-  if (!/^https?:\/\//i.test(s)) s = "https://" + s; // acepta sin protocolo
+  if (!/^https?:\/\//i.test(s)) s = "https://" + s;
 
   let u;
   try { u = new URL(s); }
@@ -160,14 +146,13 @@ function convertRaw(raw, fallbackTag, subtag) {
 /* ============== UI ============== */
 document.addEventListener("DOMContentLoaded", () => {
   const $in = document.getElementById("in");
-  const $tag = document.getElementById("tag");
   const $subtag = document.getElementById("subtag");
   const $out = document.getElementById("out");
   const $status = document.getElementById("status");
   const $go = document.getElementById("go");
   const $showLink = document.getElementById("showLink");
 
-  let lastUrl = ""; // guarda siempre el último enlace generado (aunque no se muestre)
+  let lastUrl = ""; // último enlace generado (aunque no se muestre)
 
   function setStatus(html) { $status.innerHTML = html; }
 
@@ -177,17 +162,17 @@ document.addEventListener("DOMContentLoaded", () => {
       $out.classList.remove("hidden");
     } else {
       $out.textContent = "";
-      $out.classList.remove("hidden"); // mantenemos el contenedor por estética
+      $out.classList.remove("hidden");
     }
   }
 
   function doConvert() {
     setStatus("");
     try {
-      const res = convertRaw($in.value, $tag.value || DEFAULT_TAG, $subtag.value);
+      const res = convertRaw($in.value, DEFAULT_TAG, $subtag.value);
       lastUrl = res;
       $go.href = res;
-      $go.classList.remove("hidden"); // muestra el botón "Abrir en Amazon"
+      $go.classList.remove("hidden");
       updateVisibleLink();
       setStatus('<span class="ok">✓ Enlace preparado.</span>');
     } catch (e) {
@@ -225,10 +210,11 @@ document.addEventListener("DOMContentLoaded", () => {
   $showLink.addEventListener("change", updateVisibleLink);
 
   // Enter para convertir
-  [$in, $tag, $subtag].forEach(el => el.addEventListener("keydown", e => { if (e.key === "Enter") doConvert(); }));
+  [$in, $subtag].forEach(el => el.addEventListener("keydown", e => { if (e.key === "Enter") doConvert(); }));
 });
 </script>
 </body>
 </html>
+
 
 
