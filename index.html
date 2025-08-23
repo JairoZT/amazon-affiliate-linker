@@ -37,14 +37,10 @@
   <div class="wrap">
     <div class="card">
       <h1>Generador de enlaces de afiliado Amazon</h1>
-      <p>Pega una URL de Amazon y pulsa <strong>Abrir en Amazon</strong>. Se añadirá tu <code class="k">tag=</code> (y <code class="k">ascsubtag</code> si lo indicas) y se abrirá el enlace en una pestaña nueva.</p>
+      <p>Pega una URL de Amazon y pulsa <strong>Abrir en Amazon</strong>. Se añadirá tu <code class="k">tag=</code> (y un <code class="k">ascsubtag</code> fijo, si lo defines) y se abrirá en una pestaña nueva.</p>
 
       <label for="in">URL de Amazon</label>
       <input id="in" type="text" placeholder="Ej.: https://www.amazon.es/dp/B0C1234567?ref_=..." />
-
-      <label for="subtag">Subtag (opcional)</label>
-      <input id="subtag" type="text" placeholder="p.ej. instagram-ago25" />
-      <small class="muted">Se añade como <code class="k">ascsubtag</code> para tu tracking.</small>
 
       <div class="btns">
         <button id="open">Abrir en Amazon</button>
@@ -58,7 +54,7 @@
       </div>
 
       <div class="foot">
-        <em>Recordatorio:</em> el usuario verá el <code class="k">tag=</code> en la barra de direcciones de Amazon tras abrir la página (esto es normal y conforme a las políticas).
+        <em>Recordatorio:</em> el <code class="k">tag=</code> se verá en la barra de direcciones de Amazon tras abrir la página (normal y conforme a políticas).
       </div>
     </div>
   </div>
@@ -66,8 +62,9 @@
 <script>
 "use strict";
 
-/* ====== TUS TAGS (no se muestran en la interfaz) ====== */
-const DEFAULT_TAG = "keytrading-21"; // ← tu tag principal (.es suele acabar en -21)
+/* ====== TUS TAGS Y SUBTAG FIJO (no se muestran en la interfaz) ====== */
+const DEFAULT_TAG = "keytrading-21";        // ← tu tag principal (.es suele acabar en -21)
+const FIXED_SUBTAG = "";                    // p.ej. "instagram-ago25" o "" para no usar ascsubtag
 const TAGS_BY_DOMAIN = {
   "amazon.es": "keytrading-21",
   "www.amazon.es": "keytrading-21",
@@ -98,7 +95,7 @@ function domainTagFor(hostname, fallbackTag) {
 }
 
 /* ====== NÚCLEO: LIMPIAR + ETIQUETAR ====== */
-function cleanAndTag(u, affiliateTag, subtag) {
+function cleanAndTag(u, affiliateTag, fixedSubtag) {
   u.hostname = normalizeAmazonHostname(u.hostname);
   u.protocol = "https:";
 
@@ -108,12 +105,12 @@ function cleanAndTag(u, affiliateTag, subtag) {
   }
 
   u.searchParams.set("tag", affiliateTag);
-  if (subtag) u.searchParams.set("ascsubtag", subtag);
+  if (fixedSubtag) u.searchParams.set("ascsubtag", fixedSubtag);
 
   return u.toString();
 }
 
-function convertRaw(raw, fallbackTag, subtag) {
+function convertRaw(raw, fallbackTag, fixedSubtag) {
   if (!raw) throw new Error("Pega una URL de Amazon.");
   let s = raw.trim();
   if (!/^https?:\/\//i.test(s)) s = "https://" + s;
@@ -127,22 +124,20 @@ function convertRaw(raw, fallbackTag, subtag) {
   if (!/amazon\./i.test(host)) throw new Error("Esto no parece un enlace de Amazon.");
 
   const affiliateTag = domainTagFor(host, fallbackTag);
-  return cleanAndTag(u, affiliateTag, subtag || "");
+  return cleanAndTag(u, affiliateTag, fixedSubtag || "");
 }
 
 /* ====== UI ====== */
 document.addEventListener("DOMContentLoaded", () => {
   const $in = document.getElementById("in");
-  const $subtag = document.getElementById("subtag");
   const $status = document.getElementById("status");
 
   function setStatus(html) { $status.innerHTML = html; }
 
-  async function openInAmazon() {
+  function openInAmazon() {
     setStatus("");
     try {
-      const url = convertRaw($in.value, DEFAULT_TAG, $subtag.value);
-      // Abrimos sin dejar el enlace en el DOM (no hay <a href=...>).
+      const url = convertRaw($in.value, DEFAULT_TAG, FIXED_SUBTAG);
       window.open(url, "_blank", "noopener");
       setStatus('<span class="ok">✓ Enlace abierto en una nueva pestaña.</span>');
     } catch (e) {
@@ -155,14 +150,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("clear").addEventListener("click", () => {
     $in.value = "";
-    $subtag.value = "";
     setStatus("");
   });
 
   // Enter para abrir directamente
-  [$in, $subtag].forEach(el => el.addEventListener("keydown", e => {
-    if (e.key === "Enter") openInAmazon();
-  }));
+  $in.addEventListener("keydown", e => { if (e.key === "Enter") openInAmazon(); });
 });
 </script>
 </body>
